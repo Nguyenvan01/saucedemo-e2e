@@ -1,0 +1,24 @@
+{
+  "az": {"label": "Name (A to Z)",
+    "names": ["Sauce Labs Backpack", "Sauce Labs Bike Light", "Sauce Labs Bolt T-Shirt", "Sauce Labs Fleece Jacket", "Sauce Labs Onesie", "Test.allTheThings() T-Shirt (Red)"],
+    "prices": ["$29.99", "$9.99", "$15.99", "$49.99", "$7.99", "$15.99"]},
+  "za": {"label": "Name (Z to A)",
+    "names": ["Test.allTheThings() T-Shirt (Red)", "Sauce Labs Onesie", "Sauce Labs Fleece Jacket", "Sauce Labs Bolt T-Shirt", "Sauce Labs Bike Light", "Sauce Labs Backpack"],
+    "prices": ["$15.99", "$7.99", "$49.99", "$15.99", "$9.99", "$29.99"]},
+  "lohi": {"label": "Price (low to high)",
+    "names": ["Sauce Labs Onesie", "Sauce Labs Bike Light", "Sauce Labs Bolt T-Shirt", "Test.allTheThings() T-Shirt (Red)", "Sauce Labs Backpack", "Sauce Labs Fleece Jacket"],
+    "prices": ["$7.99", "$9.99", "$15.99", "$15.99", "$29.99", "$49.99"]},
+  "hilo": {"label": "Price (high to low)",
+    "names": ["Sauce Labs Fleece Jacket", "Sauce Labs Backpack", "Sauce Labs Bolt T-Shirt", "Test.allTheThings() T-Shirt (Red)", "Sauce Labs Bike Light", "Sauce Labs Onesie"],
+    "prices": ["$49.99", "$29.99", "$15.99", "$15.99", "$9.99", "$7.99"]},
+  "cases": [
+    {"id": "INV-S01", "title": "Sắp xếp tên A -> Z", "session": "standard_user", "sort": "@data:inventory/sorting.json#az"},
+    {"id": "INV-S02", "title": "Sắp xếp tên Z -> A", "tags": ["@smoke"], "session": "standard_user", "sort": "@data:inventory/sorting.json#za"},
+    {"id": "INV-S03", "title": "Sắp xếp giá thấp -> cao", "session": "standard_user", "sort": "@data:inventory/sorting.json#lohi"},
+    {"id": "INV-S04", "title": "Sắp xếp giá cao -> thấp", "session": "standard_user", "sort": "@data:inventory/sorting.json#hilo"},
+    {"id": "INV-S05", "title": "problem_user: sắp xếp Z -> A", "session": "problem_user", "sort": "@data:inventory/sorting.json#za",
+     "knownBug": "problem_user chọn kiểu sắp xếp nhưng thứ tự sản phẩm không đổi"},
+    {"id": "INV-S06", "title": "error_user: sắp xếp giá cao -> thấp", "session": "error_user", "sort": "@data:inventory/sorting.json#hilo",
+     "knownBug": "error_user sắp xếp hiện alert 'Sorting is broken!' và thứ tự không đổi"}
+  ]
+}

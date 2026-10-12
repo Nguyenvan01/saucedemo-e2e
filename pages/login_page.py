@@ -1,0 +1,18 @@
+# Trang / - đăng nhập. Cũng là trang hiện ra khi mở trang cần đăng nhập mà chưa có phiên.
+from pages.base_page import BasePage
+
+
+class LoginPage(BasePage):
+    path = "/"
+
+    def __init__(self, page):
+        super().__init__(page)
+        self.username = page.get_by_test_id("username")
+        self.password = page.get_by_test_id("password")
+        self.login_button = page.get_by_test_id("login-button")
+        self.error_close = page.get_by_test_id("error-button")
+
+    def login(self, username, password):
+        self.username.fill(username)
+        self.password.fill(password)
+        self.login_button.click()

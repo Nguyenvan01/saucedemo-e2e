@@ -1,0 +1,10 @@
+{
+  "items": [
+    {"id": "MENU-01", "title": "Menu burger có đủ mục, About trỏ tới saucelabs.com", "tags": ["@smoke"], "session": "standard_user",
+     "items": ["All Items", "Dynamic Catalog", "About", "Logout", "Reset App State"], "aboutHref": "https://saucelabs.com/"}
+  ],
+  "allItems": [
+    {"id": "MENU-02", "title": "All Items từ giỏ hàng quay về danh sách sản phẩm", "session": "standard_user"},
+    {"id": "MENU-03", "title": "All Items từ trang chi tiết quay về danh sách sản phẩm", "session": "standard_user", "fromProductId": 4}
+  ]
+}

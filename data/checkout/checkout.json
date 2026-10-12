@@ -1,0 +1,33 @@
+{
+  "customer": {"firstName": "Hai", "lastName": "Nguyen", "postalCode": "70000"},
+  "purchase": [
+    {"id": "CHK-01", "title": "Mua 2 sản phẩm: tổng tiền = item total + tax", "tags": ["@smoke"], "session": "standard_user",
+     "products": ["Sauce Labs Backpack", "Sauce Labs Bike Light"], "itemTotal": "$39.98"},
+    {"id": "CHK-02", "title": "Mua 3 sản phẩm", "session": "standard_user",
+     "products": ["Sauce Labs Fleece Jacket", "Sauce Labs Onesie", "Test.allTheThings() T-Shirt (Red)"], "itemTotal": "$73.97"},
+    {"id": "CHK-03", "title": "performance_glitch_user mua 1 sản phẩm", "session": "performance_glitch_user",
+     "products": ["Sauce Labs Bolt T-Shirt"], "itemTotal": "$15.99"},
+    {"id": "CHK-04", "title": "problem_user điền thông tin người nhận", "session": "problem_user",
+     "products": ["Sauce Labs Backpack"], "itemTotal": "$29.99",
+     "knownBug": "problem_user gõ Last Name lại ghi đè vào First Name -> báo 'Last Name is required'"},
+    {"id": "CHK-05", "title": "error_user bấm Finish hoàn tất đơn", "session": "error_user",
+     "products": ["Sauce Labs Onesie"], "itemTotal": "$7.99",
+     "knownBug": "error_user bấm Finish không có tác dụng, đứng ở checkout-step-two"}
+  ],
+  "validation": [
+    {"id": "CHK-V01", "title": "Bỏ trống cả 3 trường", "tags": ["@smoke"], "session": "standard_user",
+     "firstName": "", "lastName": "", "postalCode": "", "error": "${msg.checkout.firstNameRequired}"},
+    {"id": "CHK-V02", "title": "Thiếu First Name", "session": "standard_user",
+     "firstName": "", "lastName": "Nguyen", "postalCode": "70000", "error": "${msg.checkout.firstNameRequired}"},
+    {"id": "CHK-V03", "title": "Thiếu Last Name", "session": "standard_user",
+     "firstName": "Hai", "lastName": "", "postalCode": "70000", "error": "${msg.checkout.lastNameRequired}"},
+    {"id": "CHK-V04", "title": "Thiếu Zip/Postal Code", "session": "standard_user",
+     "firstName": "Hai", "lastName": "Nguyen", "postalCode": "", "error": "${msg.checkout.postalCodeRequired}"}
+  ],
+  "cancel": [
+    {"id": "CHK-C01", "title": "Cancel ở bước thông tin -> về giỏ hàng", "session": "standard_user",
+     "products": ["Sauce Labs Backpack"], "cancelAt": "info", "expectedPath": "/cart.html"},
+    {"id": "CHK-C02", "title": "Cancel ở bước xem lại đơn -> về danh sách sản phẩm", "session": "standard_user",
+     "products": ["Sauce Labs Backpack"], "cancelAt": "overview", "expectedPath": "/inventory.html"}
+  ]
+}

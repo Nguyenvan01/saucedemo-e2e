@@ -1,0 +1,16 @@
+{
+  "purchase": [
+    {
+      "id": "SMOKE-01",
+      "title": "Đăng nhập qua UI → thêm giỏ → checkout → hoàn tất → logout",
+      "tags": ["@smoke"],
+      "requires": ["password"],
+      "username": "standard_user",
+      "productCount": 6,
+      "product": "Sauce Labs Backpack",
+      "customer": {"firstName": "Smoke", "lastName": "Tester", "postalCode": "10000"},
+      "completeHeader": "${msg.checkout.completeHeader}",
+      "completeText": "${msg.checkout.completeText}"
+    }
+  ]
+}

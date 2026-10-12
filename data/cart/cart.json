@@ -1,0 +1,20 @@
+{
+  "persist": [
+    {"id": "CART-01", "title": "Giỏ giữ nguyên sản phẩm sau khi reload", "tags": ["@smoke"], "session": "standard_user",
+     "products": ["Sauce Labs Backpack", "Sauce Labs Bike Light"], "ids": [4, 0]}
+  ],
+  "remove": [
+    {"id": "CART-02", "title": "Xoá 1 sản phẩm trong giỏ", "session": "standard_user",
+     "products": ["Sauce Labs Backpack", "Sauce Labs Onesie"], "remove": "Sauce Labs Backpack", "remaining": ["Sauce Labs Onesie"], "remainingIds": [2]},
+    {"id": "CART-03", "title": "Xoá sản phẩm duy nhất -> giỏ trống", "session": "standard_user",
+     "products": ["Sauce Labs Fleece Jacket"], "remove": "Sauce Labs Fleece Jacket", "remaining": [], "remainingIds": []}
+  ],
+  "continueShopping": [
+    {"id": "CART-04", "title": "Continue Shopping quay lại danh sách, giỏ giữ nguyên", "session": "standard_user",
+     "products": ["Sauce Labs Bolt T-Shirt"]}
+  ],
+  "reset": [
+    {"id": "CART-05", "title": "Reset App State xoá giỏ (badge + localStorage)", "session": "standard_user",
+     "products": ["Sauce Labs Backpack", "Sauce Labs Bike Light", "Sauce Labs Onesie"]}
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "catalog": [
+    {"id": 4, "name": "Sauce Labs Backpack", "price": "$29.99"},
+    {"id": 0, "name": "Sauce Labs Bike Light", "price": "$9.99"},
+    {"id": 1, "name": "Sauce Labs Bolt T-Shirt", "price": "$15.99"},
+    {"id": 5, "name": "Sauce Labs Fleece Jacket", "price": "$49.99"},
+    {"id": 2, "name": "Sauce Labs Onesie", "price": "$7.99"},
+    {"id": 3, "name": "Test.allTheThings() T-Shirt (Red)", "price": "$15.99"}
+  ],
+  "listing": [
+    {"id": "INV-L01", "title": "Hiển thị đủ 6 sản phẩm, đúng tên và giá", "tags": ["@smoke"], "session": "standard_user",
+     "names": "@data:inventory/sorting.json#az.names", "prices": "@data:inventory/sorting.json#az.prices"},
+    {"id": "INV-L02", "title": "visual_user: giá trên danh sách khớp giá thật", "session": "visual_user",
+     "names": "@data:inventory/sorting.json#az.names", "prices": "@data:inventory/sorting.json#az.prices",
+     "knownBug": "visual_user hiển thị giá ngẫu nhiên mỗi lần tải trang"}
+  ],
+  "addRemove": [
+    {"id": "INV-C01", "title": "Thêm 2 sản phẩm rồi bỏ 1 -> badge 2 -> 1", "tags": ["@smoke"], "session": "standard_user",
+     "add": ["Sauce Labs Backpack", "Sauce Labs Bolt T-Shirt"], "remove": "Sauce Labs Backpack", "remainingIds": [1]},
+    {"id": "INV-C02", "title": "Thêm và bỏ sản phẩm cuối danh sách", "session": "standard_user",
+     "add": ["Test.allTheThings() T-Shirt (Red)", "Sauce Labs Onesie"], "remove": "Test.allTheThings() T-Shirt (Red)", "remainingIds": [2]},
+    {"id": "INV-C03", "title": "problem_user: thêm Bolt T-Shirt vào giỏ", "session": "problem_user",
+     "add": ["Sauce Labs Backpack", "Sauce Labs Bolt T-Shirt"], "remove": "Sauce Labs Backpack", "remainingIds": [1],
+     "knownBug": "problem_user không thêm được Bolt T-Shirt / Fleece Jacket / Red T-Shirt"},
+    {"id": "INV-C04", "title": "error_user: bỏ sản phẩm ngay trên danh sách", "session": "error_user",
+     "add": ["Sauce Labs Backpack", "Sauce Labs Bike Light"], "remove": "Sauce Labs Backpack", "remainingIds": [0],
+     "knownBug": "error_user bấm Remove trên danh sách không bỏ được sản phẩm"}
+  ],
+  "detail": [
+    {"id": "INV-D01", "title": "Mở chi tiết Sauce Labs Backpack và thêm vào giỏ", "session": "standard_user",
+     "productId": 4, "name": "Sauce Labs Backpack", "price": "$29.99"},
+    {"id": "INV-D02", "title": "Mở chi tiết Sauce Labs Onesie và thêm vào giỏ", "session": "standard_user",
+     "productId": 2, "name": "Sauce Labs Onesie", "price": "$7.99"},
+    {"id": "INV-D03", "title": "problem_user: bấm Backpack mở đúng chi tiết Backpack", "session": "problem_user",
+     "productId": 4, "name": "Sauce Labs Backpack", "price": "$29.99",
+     "knownBug": "problem_user bấm Backpack lại mở chi tiết sản phẩm id=5 (Fleece Jacket)"}
+  ]
+}

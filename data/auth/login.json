@@ -1,0 +1,26 @@
+{
+  "valid": [
+    {"id": "AUTH-01", "title": "Đăng nhập hợp lệ standard_user", "tags": ["@smoke"], "requires": ["password"], "username": "standard_user"},
+    {"id": "AUTH-02", "title": "Đăng nhập hợp lệ performance_glitch_user (chậm ~5 s)", "requires": ["password"], "username": "performance_glitch_user"},
+    {"id": "AUTH-03", "title": "Đăng nhập hợp lệ problem_user", "requires": ["password"], "username": "problem_user"},
+    {"id": "AUTH-04", "title": "Đăng nhập hợp lệ error_user", "requires": ["password"], "username": "error_user"},
+    {"id": "AUTH-05", "title": "Đăng nhập hợp lệ visual_user", "requires": ["password"], "username": "visual_user"}
+  ],
+  "invalid": [
+    {"id": "AUTH-E01", "title": "Bỏ trống username và password", "tags": ["@smoke"], "username": "", "password": "", "error": "${msg.login.usernameRequired}"},
+    {"id": "AUTH-E02", "title": "Bỏ trống username, có password", "username": "", "password": "any_password", "error": "${msg.login.usernameRequired}"},
+    {"id": "AUTH-E03", "title": "Có username, bỏ trống password", "username": "standard_user", "password": "", "error": "${msg.login.passwordRequired}"},
+    {"id": "AUTH-E04", "title": "Sai mật khẩu", "username": "standard_user", "password": "wrong_password", "error": "${msg.login.wrongCredentials}"},
+    {"id": "AUTH-E05", "title": "Username không tồn tại", "requires": ["password"], "username": "unknown_user", "password": "${env.password}", "error": "${msg.login.wrongCredentials}"},
+    {"id": "AUTH-E06", "title": "User bị khoá (locked_out_user)", "requires": ["password"], "username": "locked_out_user", "password": "${env.password}", "error": "${msg.login.lockedOut}"}
+  ],
+  "protectedPages": [
+    {"id": "AUTH-P01", "title": "Mở /inventory.html khi chưa đăng nhập", "tags": ["@smoke"], "path": "/inventory.html", "error": "${msg.loginRequired.inventory}"},
+    {"id": "AUTH-P02", "title": "Mở /cart.html khi chưa đăng nhập", "path": "/cart.html", "error": "${msg.loginRequired.cart}"},
+    {"id": "AUTH-P03", "title": "Mở /checkout-step-one.html khi chưa đăng nhập", "path": "/checkout-step-one.html", "error": "${msg.loginRequired.checkoutInfo}"},
+    {"id": "AUTH-P04", "title": "Mở chi tiết sản phẩm khi chưa đăng nhập", "path": "/inventory-item.html?id=4", "error": "${msg.loginRequired.product}"}
+  ],
+  "logout": [
+    {"id": "AUTH-L01", "title": "Logout rồi mở lại /inventory.html bị chặn", "tags": ["@smoke"], "requires": ["password"], "protectedPath": "/inventory.html", "error": "${msg.loginRequired.inventory}"}
+  ]
+}
