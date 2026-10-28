@@ -1,37 +1,67 @@
 # Trang /inventory.html - danh sách 6 sản phẩm, sắp xếp, thêm/bỏ giỏ.
-import re
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import Select
 
-from pages.base_page import BasePage, slug
+from pages.base_page import BasePage, by_test, slug, step
 
 
 class InventoryPage(BasePage):
     path = "/inventory.html"
+    LIST = by_test("inventory-list")
+    ITEMS = by_test("inventory-item")
+    NAMES = by_test("inventory-item-name")
+    PRICES = by_test("inventory-item-price")
+    SORT_SELECT = by_test("product-sort-container")
+    ACTIVE_SORT = by_test("active-option")
+    landmark = LIST
 
-    def __init__(self, page):
-        super().__init__(page)
-        self.list = page.get_by_test_id("inventory-list")
-        self.items = page.get_by_test_id("inventory-item")
-        self.names = page.get_by_test_id("inventory-item-name")
-        self.prices = page.get_by_test_id("inventory-item-price")
-        self.sort_select = page.get_by_test_id("product-sort-container")
-        self.active_sort = page.get_by_test_id("active-option")
+    def names(self):
+        return self.texts(self.NAMES)
 
-    def item(self, name):
-        exact = self.page.get_by_test_id("inventory-item-name").filter(has_text=re.compile(f"^{re.escape(name)}$"))
-        return self.items.filter(has=exact)
+    def prices(self):
+        return self.texts(self.PRICES)
 
-    def name_of(self, name):
-        return self.item(name).get_by_test_id("inventory-item-name")
+    def product_count(self):
+        return self.count(self.ITEMS)
+
+    def _item(self, name):
+        """Thẻ sản phẩm có tên đúng nguyên văn `name`."""
+        self.wait_loaded()
+        for item in self.find_all(self.ITEMS):
+            if item.find_element(*self.NAMES).text == name:
+                return item
+        raise ValueError(f"Không có sản phẩm {name!r} trên danh sách")
 
     def price_of(self, name):
-        return self.item(name).get_by_test_id("inventory-item-price")
+        return self._item(name).find_element(*self.PRICES).text
 
-    def button_of(self, name):
-        """Nút của item ở trạng thái bất kỳ: data-test "add-to-cart-<slug>" hoặc "remove-<slug>"."""
-        return self.page.get_by_test_id(re.compile(f"^(add-to-cart|remove)-{re.escape(slug(name))}$"))
+    def button_text(self, name):
+        """Nhãn nút của sản phẩm: "Add to cart" hoặc "Remove"."""
+        s = slug(name)
+        return self.text((By.CSS_SELECTOR, f'[data-test="add-to-cart-{s}"], [data-test="remove-{s}"]'))
 
-    def add_button(self, name):
-        return self.page.get_by_test_id(f"add-to-cart-{slug(name)}")
+    @step('Sắp xếp theo "{label}"')
+    def sort_by(self, label):
+        Select(self.find(self.SORT_SELECT)).select_by_visible_text(label)
 
-    def remove_button(self, name):
-        return self.page.get_by_test_id(f"remove-{slug(name)}")
+    def active_sort(self):
+        return self.text(self.ACTIVE_SORT)
+
+    @step('Thêm "{name}" vào giỏ')
+    def add_to_cart(self, name):
+        self.click(by_test(f"add-to-cart-{slug(name)}"))
+
+    def add_all_to_cart(self, names):
+        for name in names:
+            self.add_to_cart(name)
+
+    @step('Bỏ "{name}" khỏi giỏ từ danh sách')
+    def remove_from_cart(self, name):
+        self.click(by_test(f"remove-{slug(name)}"))
+
+    @step('Mở chi tiết "{name}"')
+    def open_product(self, name):
+        self._item(name).find_element(*self.NAMES).click()
+        from pages.product_detail_page import ProductDetailPage  # import vòng: trang chi tiết quay về danh sách
+
+        return ProductDetailPage(self.driver).wait_loaded()

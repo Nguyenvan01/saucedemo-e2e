@@ -1,9 +1,7 @@
 .env
-.auth/
 artifacts/
 test-results/
 .venv/
 __pycache__/
 *.pyc
 .pytest_cache/
-~$*.xlsx

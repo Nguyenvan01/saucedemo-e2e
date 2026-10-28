@@ -1,19 +1,26 @@
 # Trang /checkout-step-one.html - nhập thông tin người nhận.
-from pages.base_page import BasePage
+from pages.base_page import BasePage, by_test, step
 
 
 class CheckoutInfoPage(BasePage):
     path = "/checkout-step-one.html"
+    FIRST_NAME = by_test("firstName")
+    LAST_NAME = by_test("lastName")
+    POSTAL_CODE = by_test("postalCode")
+    CONTINUE_BUTTON = by_test("continue")
+    CANCEL_BUTTON = by_test("cancel")
+    landmark = FIRST_NAME
 
-    def __init__(self, page):
-        super().__init__(page)
-        self.first_name = page.get_by_test_id("firstName")
-        self.last_name = page.get_by_test_id("lastName")
-        self.postal_code = page.get_by_test_id("postalCode")
-        self.continue_button = page.get_by_test_id("continue")
-        self.cancel_button = page.get_by_test_id("cancel")
-
+    @step('Nhập thông tin "{first_name}" / "{last_name}" / "{postal_code}"')
     def fill(self, first_name, last_name, postal_code):
-        self.first_name.fill(first_name)
-        self.last_name.fill(last_name)
-        self.postal_code.fill(postal_code)
+        self.type(self.FIRST_NAME, first_name)
+        self.type(self.LAST_NAME, last_name)
+        self.type(self.POSTAL_CODE, postal_code)
+
+    @step("Bấm Continue")
+    def submit(self):
+        self.click(self.CONTINUE_BUTTON)
+
+    @step("Bấm Cancel")
+    def cancel(self):
+        self.click(self.CANCEL_BUTTON)

@@ -10,9 +10,9 @@ trên trang login — **không** ghi vào repo, chỉ đặt trong `.env`.
 |---|---|---|---|
 | 1 | Menu: All Items, About, Logout, Reset App State | Có thêm **Dynamic Catalog** (`dynamic-catalog-sidebar-link`) | Ghi nhận; ngoài phạm vi test tối thiểu |
 | 2 | Truy cập `/inventory.html` khi chưa đăng nhập → về login | **URL giữ nguyên** `/inventory.html`, trang hiển thị form login + lỗi riêng cho từng path | `verifyUrl` không dùng được; kiểm tra form login + thông báo lỗi |
-| 3 | Phiên ở cookie | Cookie `session-username` = **tên user** (không phải token), **hết hạn sau 600 giây** | storageState trong `.auth/` chỉ sống 10 phút → `auth_states` phải tạo lại khi hết hạn |
+| 3 | Phiên ở cookie | Cookie `session-username` = **tên user** (không phải token), **hết hạn sau 600 giây** | Cookie phiên chỉ sống 10 phút → `auth_sessions` phải đăng nhập lại khi sắp hết hạn |
 | 4 | Giỏ ở localStorage | Khoá `cart-contents` = mảng JSON **id sản phẩm**, ví dụ `"[4,0]"`; ngoài ra có `backtrace-guid`, `backtrace-last-active` (SDK báo lỗi) | Chỉ quan tâm `cart-contents` |
-| 5 | Mọi phần tử có `data-test` | Nút mở/đóng menu **không** có `data-test` trên `<button>` (chỉ có trên `<img>` `open-menu`/`close-menu`) | Dùng `get_by_role("button", name="Open Menu"/"Close Menu")` |
+| 5 | Mọi phần tử có `data-test` | Nút mở/đóng menu **không** có `data-test` trên `<button>` (chỉ có trên `<img>` `open-menu`/`close-menu`) | `<img>` bị `<button>` trong suốt phủ lên (click không tới) → dùng id của nút: `react-burger-menu-btn` / `react-burger-cross-btn` |
 | 6 | — | Trang chi tiết dùng `add-to-cart` / `remove` (không kèm slug), không có `data-test="title"` | Page Object riêng cho chi tiết |
 | 7 | — | Reset App State xoá badge + `cart-contents` nhưng **nút "Remove" trên trang hiện tại vẫn còn** tới khi reload; menu vẫn mở | Hành vi gốc của site (cả standard_user) — kiểm tra badge + localStorage, xem mục 7 |
 | 8 | — | performance_glitch_user: URL đổi sang `/inventory.html` ngay nhưng danh sách sản phẩm **~5,5 s** mới hiện | Chờ theo phần tử (`inventory-list`), timeout ≥ 10 s; không chờ theo URL |
@@ -122,7 +122,7 @@ Nhấn `error-button` → khung lỗi biến mất.
 | Logout | cookie bị xoá | `backtrace-*` giữ lại |
 
 - Giỏ còn nguyên sau `reload` (đã xác minh).
-- `context.storage_state()` trả về `cookies` + `origins` (localStorage) → dùng trực tiếp cho `.auth/<user>.json`.
+- Selenium `get_cookie("session-username")` lấy được cookie phiên → gắn lại bằng `add_cookie` cho Chrome của test khác.
 - Thuế = 8 % item total, làm tròn 2 số lẻ: $9.99 → $0.80; $29.99 → $2.40; $47.97 → $3.84.
 - Cancel ở Checkout 1 → `/cart.html`; Cancel ở Checkout 2 → `/inventory.html`; Back Home → `/inventory.html`.
 
@@ -139,8 +139,8 @@ Nhấn `error-button` → khung lỗi biến mất.
 
 ## 8. Ghi chú cho thiết kế framework
 
-- `test_id_attribute="data-test"` phủ gần hết; ngoại lệ duy nhất cần `get_by_role` là 2 nút burger.
+- Locator `[data-test="..."]` (`by_test`) phủ gần hết; ngoại lệ duy nhất là 2 nút burger (dùng `By.ID`).
 - `data-test` trùng lặp (`inventory-item-name`, `inventory-item-price`, `error`…) → luôn lọc theo item cha
-  (`get_by_test_id("inventory-item").filter(has_text=...)`), không dùng `nth` theo cấu trúc DOM.
+  (tìm `inventory-item` có tên đúng nguyên văn rồi tìm phần tử con), không dùng `nth` theo cấu trúc DOM.
 - Không có API → không có `api_client`; mọi điều kiện đầu (giỏ có sẵn hàng) dựng bằng UI hoặc `localStorage`
   (`cart-contents`) trong `utils/storage.py`.

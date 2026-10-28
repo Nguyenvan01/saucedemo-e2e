@@ -32,7 +32,6 @@ MODULES = {
     "e2e/cart": "UI - Giỏ hàng",
     "e2e/checkout": "UI - Thanh toán",
     "e2e/menu": "UI - Menu",
-    "e2e/keyword_driven": "Kịch bản Keyword-driven (Excel)",
     "framework": "Framework - unit test",
 }
 

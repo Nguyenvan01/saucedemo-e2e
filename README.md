@@ -1,23 +1,24 @@
 # saucedemo-e2e
 
-Framework kiểm thử tự động cho https://www.saucedemo.com (Swag Labs) theo mô hình
-**Hybrid = Page Object + Keyword-Driven + Data-Driven**, viết bằng Python + pytest + Playwright (Chromium).
+Framework kiểm thử tự động **hướng dữ liệu (Data-Driven)** với **Selenium WebDriver**, ứng dụng cho website
+https://www.saucedemo.com (Swag Labs). Viết bằng Python + pytest + Selenium 4 (Google Chrome), kết hợp Page Object Model.
 
 - Kiến trúc bên trong: [ARCHITECTURE.md](ARCHITECTURE.md)
 - Khảo sát trang thật (data-test, URL, thông báo nguyên văn): [docs/site-survey.md](docs/site-survey.md)
-- Danh mục keyword (tự sinh): [KEYWORDS.md](KEYWORDS.md)
 - Danh mục test case + kết quả lần chạy gần nhất (tự sinh): [TEST_CASES.md](TEST_CASES.md)
 
 ## Cài đặt
 
-Cần Python 3.11+.
+Cần Python 3.11+ và Google Chrome. Selenium Manager (đi kèm selenium) tự tải chromedriver khớp phiên bản Chrome.
 
 ```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python -m playwright install chromium
 cp .env.example .env      # rồi điền SAUCE_PASSWORD (mật khẩu chung hiển thị ở trang login)
 ```
+
+> Nếu máy có chromedriver cũ trong `PATH` (vd `/usr/local/bin/chromedriver`), Selenium sẽ dùng nó và báo
+> `This version of ChromeDriver only supports Chrome version ...` → xoá/cập nhật file đó để Selenium Manager tự tải bản đúng.
 
 `.env` đã được gitignore. Thiếu `SAUCE_PASSWORD` thì các test cần đăng nhập tự **skip**, phần còn lại vẫn chạy.
 
@@ -26,7 +27,6 @@ cp .env.example .env      # rồi điền SAUCE_PASSWORD (mật khẩu chung hi�
 | `SAUCE_PASSWORD` | Mật khẩu chung của các tài khoản saucedemo | (trống) |
 | `BASE_URL` | URL trang cần test | `https://www.saucedemo.com` |
 | `TEST_LOG_LEVEL` | `DEBUG` / `INFO` / `WARNING` / `ERROR` | `INFO` |
-| `SLOW_MO` | Làm chậm thao tác (ms) để quan sát | — |
 
 ## Chạy test
 
@@ -36,8 +36,7 @@ cp .env.example .env      # rồi điền SAUCE_PASSWORD (mật khẩu chung hi�
 .venv/bin/python -m pytest -n 4                       # toàn bộ, 4 worker song song
 .venv/bin/python -m pytest -n 4 -m e2e                # chỉ UI
 .venv/bin/python -m pytest -m smoke                   # bộ smoke
-.venv/bin/python -m pytest -m keyword                 # kịch bản Excel
-.venv/bin/python -m pytest -k CHK-01 --headed         # 1 case, mở trình duyệt
+.venv/bin/python -m pytest -k CHK-01 --headed         # 1 case, mở cửa sổ Chrome (mặc định headless)
 ```
 
 Kết quả nằm trong `artifacts/prod/`:
@@ -46,7 +45,6 @@ Kết quả nằm trong `artifacts/prod/`:
 logs/            run_<run_id>[_gwN].log
 screenshots/     <run_id>/*.png      (khi FAIL)
 page_sources/    <run_id>/*.html     (khi FAIL)
-traces/          <run_id>/*/trace.zip, video (khi FAIL) -> xem: .venv/bin/python -m playwright show-trace <file>
 junit/results.xml
 allure-results/  -> xem: allure serve artifacts/prod/allure-results
 ```
@@ -67,22 +65,20 @@ allure-results/  -> xem: allure serve artifacts/prod/allure-results
 
 ```text
 config.py            cấu hình, đọc .env
-data/                auth/ inventory/ cart/ checkout/ *.json ; scenarios/*.xlsx
-pages/               Page Object (locator CHỈ nằm ở đây)
-keywords/            7 nhóm keyword: common, auth, inventory, product, cart, checkout, menu
-drivers/             driver_script.py: chạy kịch bản keyword-driven
+data/                auth/ inventory/ cart/ checkout/ *.json  (test case = dữ liệu)
+pages/               Page Object Selenium (locator CHỈ nằm ở đây)
 utils/               logging, phân loại lỗi, evidence, đọc dữ liệu, storage, thông báo
 tests/framework/     unit test framework
-tests/e2e/           smoke, auth, inventory, cart, checkout, menu, keyword_driven
-scripts/             sinh KEYWORDS.md, TEST_CASES.md, data/scenarios/*.xlsx
+tests/e2e/           smoke, auth, inventory, cart, checkout, menu
+scripts/             sinh TEST_CASES.md
 .github/workflows/   CI
 ```
 
-## Viết test
+## Viết test (data-driven)
 
-### 1. Data-driven (JSON + pytest)
+### 1. Thêm case = thêm dữ liệu
 
-Thêm case = thêm phần tử JSON, không sửa code. Ví dụ `data/checkout/checkout.json`:
+Mỗi phần tử JSON trong `data/` là một test case; thêm case không cần sửa code. Ví dụ `data/checkout/checkout.json`:
 
 ```json
 {"id": "CHK-06", "title": "Mua áo khoác + onesie", "session": "standard_user",
@@ -92,7 +88,7 @@ Thêm case = thêm phần tử JSON, không sửa code. Ví dụ `data/checkout/
 | Khoá | Ý nghĩa |
 |---|---|
 | `id`, `title` | Bắt buộc. id duy nhất, hiện trong report và chọn được bằng `-k` |
-| `session` | Chạy với phiên đăng nhập sẵn của user (đăng nhập qua UI 1 lần, lưu `.auth/`) |
+| `session` | Chạy với phiên đăng nhập sẵn của user (đăng nhập qua UI 1 lần mỗi worker, dùng lại cookie) |
 | `tags` | `["@smoke"]` → marker `smoke` |
 | `requires` | `["password"]` → skip nếu thiếu `SAUCE_PASSWORD` |
 | `knownBug` | Mô tả bug cố ý → `xfail(strict=True)` |
@@ -100,46 +96,35 @@ Thêm case = thêm phần tử JSON, không sửa code. Ví dụ `data/checkout/
 Giá trị có thể dùng biến: `"${msg.login.lockedOut}"` (thông báo nguyên văn trong `utils/messages.py`),
 `"${env.password}"`, `"${uid}"`, `"@data:inventory/sorting.json#za.names"` (nạp từ file khác).
 
-Test chỉ gọi keyword:
+### 2. Test = luồng + so sánh với dữ liệu
+
+Test nạp dữ liệu, tham số hoá bằng `case_params`, thao tác qua Page Object (fixture `po`) và `assert` với dữ liệu:
 
 ```python
-@pytest.mark.parametrize("case", case_params(DATA["purchase"]))
-def test_purchase(k, ctx, case):
-    k.inventory.add_products_to_cart(case["products"])
-    k.cart.open_cart()
-    ...
+DATA = load_data("auth/login.json")
+
+@pytest.mark.parametrize("case", case_params(DATA["invalid"]))
+def test_login_invalid(po, ctx, case):
+    c = resolve_data(case, ctx)
+    po.login.open()
+    po.login.login(c["username"], c["password"])
+    assert po.login.error_message() == c["error"]
 ```
 
-### 2. Keyword-driven (Excel)
+### 3. Page Object mới
 
-Kịch bản nằm trong `data/scenarios/*.xlsx`, **sinh bằng** `scripts/gen_scenarios_xlsx.py`
-(sửa định nghĩa trong script rồi chạy lại, đừng sửa tay file .xlsx):
-
-```bash
-.venv/bin/python scripts/gen_scenarios_xlsx.py
-```
-
-- Sheet `TestSteps`: `template_id | step | keyword | args | note` — `args` là mảng JSON, placeholder `{cot}`.
-- Sheet `TestData`: `case_id | template_id | title | tags | requires | known_bug | <cột placeholder...>` —
-  mỗi dòng là 1 test case.
-- Mỗi kịch bản phải có ít nhất 1 bước `verify*` / `…Expecting…`; sai schema / keyword lạ / thiếu placeholder
-  báo lỗi ngay lúc `--collect-only`.
-
-### 3. Keyword mới
-
-1. Locator trong `pages/` (ưu tiên `get_by_test_id`, sau đó `get_by_role`).
-2. Method có `@keyword("tenCamelCase")` + docstring 1 dòng trong `keywords/kw_<nhóm>.py`, thân bọc `with self.step(...)`.
-3. Cập nhật tài liệu: `.venv/bin/python scripts/gen_keywords_doc.py`.
+1. Lớp con `BasePage` trong `pages/`: `path`, `landmark`, locator dạng `by_test("data-test-value")`.
+2. Thao tác nghiệp vụ bọc `@step('Mô tả "{tham_so}"')` → hiện thành Allure step + log.
+3. Thêm vào `pages/page_objects.py` để dùng qua `po.<tên>`.
 
 ## Tài liệu tự sinh
 
 ```bash
-.venv/bin/python scripts/gen_keywords_doc.py     # -> KEYWORDS.md
 .venv/bin/python scripts/gen_test_cases.py       # -> TEST_CASES.md (từ allure-results lần chạy gần nhất)
 ```
 
 ## CI
 
 [.github/workflows/e2e.yml](.github/workflows/e2e.yml) chạy khi push/PR vào `main` hoặc chạy tay (chọn marker):
-collect-only → `pytest -n 4` → bảng tóm tắt JUnit → upload `artifacts/prod/`.
+collect-only → `pytest -n 4` (Chrome có sẵn trên runner ubuntu) → bảng tóm tắt JUnit → upload `artifacts/prod/`.
 Cần secret `SAUCE_PASSWORD` trong Settings → Secrets and variables → Actions.

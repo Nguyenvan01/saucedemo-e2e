@@ -5,7 +5,7 @@
 # - Ghi cùng một sự kiện ra console và file log của lần chạy.
 # - Cho phép đổi mức log bằng TEST_LOG_LEVEL.
 # - Chuẩn hóa ngữ cảnh: TC_ID | Step | Action | Target | Result.
-# - TC_ID của test đang chạy được giữ trong contextvar -> keyword không cần truyền tay.
+# - TC_ID của test đang chạy được giữ trong contextvar -> Page Object không cần truyền tay.
 # ============================================================
 import logging
 import os

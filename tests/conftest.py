@@ -1,9 +1,9 @@
 # ============================================================
 # PYTEST LIFECYCLE
-# - pytest_configure: tạo thư mục evidence, cấu hình log, JUnit, Allure, trace, retry.
-# - Fixture tạo browser context riêng cho mỗi test (pytest-playwright), data-test làm test id.
-# - auth_states: đăng nhập qua UI một lần cho mỗi user cần dùng, lưu storageState vào .auth/;
-#   cookie phiên saucedemo chỉ sống 600 s -> file sắp hết hạn thì đăng nhập lại.
+# - pytest_configure: tạo thư mục evidence, cấu hình log, JUnit, Allure, retry.
+# - Fixture `driver`: mỗi test một Chrome (Selenium WebDriver) riêng, đóng khi test xong.
+# - auth_sessions: đăng nhập qua UI một lần cho mỗi user cần dùng (mỗi worker), giữ cookie phiên;
+#   cookie saucedemo chỉ sống 600 s -> sắp hết hạn thì đăng nhập lại.
 # - Hook thu evidence khi call FAIL: screenshot + HTML + URL + category.
 # - Lỗi evidence chỉ ghi WARNING, không che lỗi test gốc. Không log mật khẩu.
 # ============================================================
@@ -13,32 +13,31 @@ from datetime import datetime
 
 import allure
 import pytest
-from playwright.sync_api import expect
+from selenium import webdriver
 
 from config import (
-    ACTION_TIMEOUT,
     ARTIFACTS_DIR,
-    AUTH_DIR,
     AUTH_MIN_REMAINING_SECONDS,
     BASE_URL,
-    EXPECT_TIMEOUT,
     IS_CI,
     LOCALE,
-    NAVIGATION_TIMEOUT,
+    PAGE_LOAD_TIMEOUT,
     PASSWORD,
     TEST_ENV,
-    TEST_ID_ATTRIBUTE,
     USERS,
-    VIEWPORT,
+    WINDOW_SIZE,
 )
-from keywords import Keywords
 from pages.page_objects import PageObjects
 from utils.artifact_manager import create_artifact_layout, safe_artifact_name
 from utils.cases import case_title
 from utils.data_loader import base_context
 from utils.error_classifier import classify_report_text
 from utils.logging_config import LOGGER_NAME, configure_logging, current_tc_id, event_context
-from utils.storage import session_seconds_left, write_storage_state
+from utils.storage import STORAGE_KEYS, session_seconds_left
+
+
+def pytest_addoption(parser):
+    parser.addoption("--headed", action="store_true", help="Mở cửa sổ Chrome (mặc định chạy headless)")
 
 
 def _worker_id(config):
@@ -60,20 +59,11 @@ def pytest_configure(config):
         config.option.xmlpath = str(layout.junit / "results.xml")
     if hasattr(config.option, "allure_report_dir") and not config.option.allure_report_dir:
         config.option.allure_report_dir = str(layout.allure_results)
-    if config.option.tracing == "off":
-        config.option.tracing = "retain-on-failure"
-    if config.option.video == "off":
-        config.option.video = "retain-on-failure"
-    if config.option.output == "test-results":
-        config.option.output = str(layout.traces)
     # Site tĩnh, ổn định -> chỉ retry trên CI (mạng runner).
     rerun_given = any(arg.startswith("--reruns") for arg in config.invocation_params.args)
     if hasattr(config.option, "reruns") and not rerun_given:
         config.option.reruns = 1 if IS_CI else 0
-    if os.getenv("SLOW_MO") and not config.option.slowmo:
-        config.option.slowmo = float(os.environ["SLOW_MO"])
 
-    expect.set_options(timeout=EXPECT_TIMEOUT)
     logger.info(
         f"Bắt đầu pytest session; env={TEST_ENV}, base_url={BASE_URL}, password={'có' if PASSWORD else 'THIẾU'}",
         extra=event_context(action="pytest_session", result="START"),
@@ -81,15 +71,13 @@ def pytest_configure(config):
 
 
 def pytest_collection_modifyitems(config, items):
-    """Gắn marker theo thư mục: tests/framework -> core, tests/e2e -> e2e (+ keyword)."""
+    """Gắn marker theo thư mục: tests/framework -> core, tests/e2e -> e2e."""
     for item in items:
         path = item.path.as_posix()
         if "/tests/framework/" in path:
             item.add_marker(pytest.mark.core)
         elif "/tests/e2e/" in path:
             item.add_marker(pytest.mark.e2e)
-        if "/tests/e2e/keyword_driven/" in path:
-            item.add_marker(pytest.mark.keyword)
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -111,22 +99,22 @@ def pytest_runtest_makereport(item, call):
     allure.dynamic.label("error_category", category)
     allure.attach(category, "error-category", allure.attachment_type.TEXT)
 
-    page = item.funcargs.get("page") if hasattr(item, "funcargs") else None
-    if page is None or page.is_closed():
+    driver = item.funcargs.get("driver") if hasattr(item, "funcargs") else None
+    if driver is None:
         return
     layout = item.config._e2e_layout
     name = safe_artifact_name(item.nodeid)
     try:
-        screenshot = page.screenshot(full_page=True)
+        screenshot = driver.get_screenshot_as_png()
         screenshot_path = layout.screenshots / f"{name}.png"
         screenshot_path.write_bytes(screenshot)
         allure.attach(screenshot, "failure-screenshot", allure.attachment_type.PNG)
 
-        source = page.content()
+        source = driver.page_source
         source_path = layout.page_sources / f"{name}.html"
         source_path.write_text(source, encoding="utf-8")
         allure.attach(source, "page-source", allure.attachment_type.HTML)
-        allure.attach(page.url, "current-url", allure.attachment_type.TEXT)
+        allure.attach(driver.current_url, "current-url", allure.attachment_type.TEXT)
         logger.info(
             f"Đã lưu evidence: {screenshot_path.name}, {source_path.name}",
             extra=event_context(tc_id=item.name, action="collect_evidence", result="PASS"),
@@ -168,72 +156,73 @@ def _test_context(request):
 
 
 # ---------------------------------------------------------------------------
-# Browser: data-test làm test id, phiên đăng nhập sẵn theo user
+# Browser: Chrome qua Selenium WebDriver, phiên đăng nhập sẵn theo user
 # ---------------------------------------------------------------------------
 
+def _new_driver(config):
+    options = webdriver.ChromeOptions()
+    if not config.getoption("headed"):
+        options.add_argument("--headless=new")
+    options.add_argument("--window-size={},{}".format(*WINDOW_SIZE))
+    options.add_argument(f"--lang={LOCALE}")
+    if IS_CI:
+        options.add_argument("--disable-dev-shm-usage")
+    # Tắt trình quản lý mật khẩu: Chrome hiện popup "mật khẩu bị lộ" che trang khi dùng mật khẩu demo.
+    options.add_experimental_option("prefs", {
+        "credentials_enable_service": False,
+        "profile.password_manager_enabled": False,
+        "profile.password_manager_leak_detection": False,
+        "intl.accept_languages": LOCALE,
+    })
+    driver = webdriver.Chrome(options=options)
+    driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)
+    return driver
+
+
 @pytest.fixture(scope="session")
-def _test_id_attribute(playwright):
-    playwright.selectors.set_test_id_attribute(TEST_ID_ATTRIBUTE)
-
-
-def _context_options():
-    return {"base_url": BASE_URL, "locale": LOCALE, "viewport": VIEWPORT}
-
-
-@pytest.fixture(scope="session")
-def auth_states(browser, _test_id_attribute):
-    """Hàm user -> file storageState còn hạn. Đăng nhập qua UI lần đầu cần dùng (mỗi worker),
+def auth_sessions(pytestconfig):
+    """Hàm user -> cookie phiên còn hạn. Đăng nhập qua UI lần đầu cần dùng (mỗi worker),
     và đăng nhập lại khi cookie còn dưới AUTH_MIN_REMAINING_SECONDS."""
+    cookies = {}
 
     def get(user):
         if user not in USERS:
             raise ValueError(f"user không hợp lệ: {user!r}; chọn {USERS}")
-        file = AUTH_DIR / f"{TEST_ENV}-{user}.json"
-        if session_seconds_left(file) >= AUTH_MIN_REMAINING_SECONDS:
-            return file
-        context = browser.new_context(**_context_options())
+        if session_seconds_left(cookies.get(user)) >= AUTH_MIN_REMAINING_SECONDS:
+            return cookies[user]
+        driver = _new_driver(pytestconfig)
         try:
-            context.set_default_timeout(ACTION_TIMEOUT)
-            po = PageObjects(context.new_page())
-            po.login.goto()
-            po.login.login(user, PASSWORD)
-            expect(po.inventory.list).to_be_visible()
-            write_storage_state(file, context.storage_state())
+            PageObjects(driver).login.login_as(user, PASSWORD)
+            cookies[user] = driver.get_cookie(STORAGE_KEYS["session"])
         finally:
-            context.close()
+            driver.quit()
         logging.getLogger(LOGGER_NAME).info(
             f"Đã tạo phiên đăng nhập cho {user}",
-            extra=event_context(action="auth_states", target=file.name, result="PASS"),
+            extra=event_context(action="auth_sessions", target=user, result="PASS"),
         )
-        return file
+        return cookies[user]
 
     return get
 
 
 @pytest.fixture
-def browser_context_args(browser_context_args, request):
-    """Mở rộng context mặc định của pytest-playwright: base_url, locale, viewport, phiên đăng nhập.
-    Phiên chọn bằng marker: @pytest.mark.role("standard_user")."""
-    args = {**browser_context_args, **_context_options()}
+def driver(request):
+    """Chrome riêng cho test. Phiên chọn bằng marker: @pytest.mark.role("standard_user")."""
     marker = request.node.get_closest_marker("role")
+    cookie = None
     if marker:
         if not PASSWORD:
             pytest.skip("Cần SAUCE_PASSWORD trong .env")
-        args["storage_state"] = str(request.getfixturevalue("auth_states")(marker.args[0]))
-    return args
-
-
-@pytest.fixture
-def context(new_context, _test_id_attribute):
-    context = new_context()
-    context.set_default_timeout(ACTION_TIMEOUT)
-    context.set_default_navigation_timeout(NAVIGATION_TIMEOUT)
-    return context
-
-
-@pytest.fixture
-def page(context):
-    return context.new_page()
+        cookie = request.getfixturevalue("auth_sessions")(marker.args[0])
+    driver = _new_driver(request.config)
+    try:
+        if cookie:
+            # Cookie chỉ gắn được khi đang ở đúng domain.
+            driver.get(BASE_URL + "/")
+            driver.add_cookie({key: cookie[key] for key in ("name", "value", "path", "expiry")})
+        yield driver
+    finally:
+        driver.quit()
 
 
 # ---------------------------------------------------------------------------
@@ -241,15 +230,9 @@ def page(context):
 # ---------------------------------------------------------------------------
 
 @pytest.fixture
-def k(page):
-    """Thư viện keyword (tầng nghiệp vụ) - cách viết test chính."""
-    return Keywords(page)
-
-
-@pytest.fixture
-def po(k):
-    """Page Object - dùng khi cần locator trực tiếp trong test."""
-    return k.po
+def po(driver):
+    """Page Object của test - cách viết test chính: po.login, po.inventory, po.cart..."""
+    return PageObjects(driver)
 
 
 @pytest.fixture

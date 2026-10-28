@@ -14,11 +14,11 @@ DATA = load_data("auth/login.json#logout")
 
 @pytest.mark.role("standard_user")
 @pytest.mark.parametrize("case", case_params(DATA))
-def test_logout(k, ctx, case):
+def test_logout(po, ctx, case):
     c = resolve_data(case, ctx)
-    k.inventory.open_inventory()
-    k.menu.logout()
-    k.common.verify_url(ROUTES["login"])
-    k.auth.verify_login_form_displayed()
-    k.common.open_page(c["protectedPath"])
-    k.common.verify_error_message(c["error"])
+    po.inventory.open()
+    po.menu.logout()
+    assert po.login.current_path() == ROUTES["login"]
+    assert po.login.form_displayed()
+    po.base.open(c["protectedPath"])
+    assert po.login.error_message() == c["error"]

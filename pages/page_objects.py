@@ -1,4 +1,4 @@
-# Gom toàn bộ Page Object của 1 `page` - tầng Keyword dùng qua đây (k.po.header, k.po.cart...).
+# Gom toàn bộ Page Object của 1 WebDriver - test dùng qua fixture `po` (po.login, po.cart...).
 from pages.base_page import BasePage
 from pages.cart_page import CartPage
 from pages.checkout_complete_page import CheckoutCompletePage
@@ -12,15 +12,15 @@ from pages.product_detail_page import ProductDetailPage
 
 
 class PageObjects:
-    def __init__(self, page):
-        self.page = page
-        self.base = BasePage(page)
-        self.header = Header(page)
-        self.menu = BurgerMenu(page)
-        self.login = LoginPage(page)
-        self.inventory = InventoryPage(page)
-        self.product = ProductDetailPage(page)
-        self.cart = CartPage(page)
-        self.checkout_info = CheckoutInfoPage(page)
-        self.checkout_overview = CheckoutOverviewPage(page)
-        self.checkout_complete = CheckoutCompletePage(page)
+    def __init__(self, driver):
+        self.driver = driver
+        self.base = BasePage(driver)
+        self.header = Header(driver)
+        self.menu = BurgerMenu(driver)
+        self.login = LoginPage(driver)
+        self.inventory = InventoryPage(driver)
+        self.product = ProductDetailPage(driver)
+        self.cart = CartPage(driver)
+        self.checkout_info = CheckoutInfoPage(driver)
+        self.checkout_overview = CheckoutOverviewPage(driver)
+        self.checkout_complete = CheckoutCompletePage(driver)

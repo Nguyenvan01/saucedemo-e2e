@@ -14,23 +14,23 @@ DATA = load_data("inventory/menu.json")
 
 
 @pytest.fixture(autouse=True)
-def open_inventory(k):
-    k.inventory.open_inventory()
+def open_inventory(po):
+    po.inventory.open()
 
 
 @pytest.mark.parametrize("case", case_params(DATA["items"]))
-def test_menu_items(k, case):
-    k.menu.open_menu()
-    k.menu.verify_menu_items(case["items"])
-    k.menu.verify_about_link(case["aboutHref"])
-    k.menu.close_menu()
+def test_menu_items(po, case):
+    po.menu.open_menu()
+    assert po.menu.item_texts(case["items"]) == case["items"]
+    assert po.menu.about_href() == case["aboutHref"]
+    po.menu.close_menu()
 
 
 @pytest.mark.parametrize("case", case_params(DATA["allItems"]))
-def test_all_items(k, case):
+def test_all_items(po, case):
     if "fromProductId" in case:
-        k.product.open_product_by_id(case["fromProductId"])
+        po.product.open_by_id(case["fromProductId"])
     else:
-        k.cart.open_cart()
-    k.menu.goto_all_items()
-    k.common.verify_url(ROUTES["inventory"])
+        po.header.open_cart()
+    po.menu.all_items()
+    assert po.inventory.current_path() == ROUTES["inventory"]

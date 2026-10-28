@@ -2,8 +2,15 @@
 # UNIT: utils/error_classifier - cùng một taxonomy lỗi cho log / JUnit / Allure.
 # ============================================================
 import pytest
-from playwright.sync_api import Error as PlaywrightError
-from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+from selenium.common.exceptions import (
+    ElementClickInterceptedException,
+    InvalidSessionIdException,
+    NoSuchElementException,
+    StaleElementReferenceException,
+    TimeoutException,
+    UnexpectedAlertPresentException,
+    WebDriverException,
+)
 
 from utils.error_classifier import classify_exception, classify_report_text
 
@@ -12,11 +19,14 @@ from utils.error_classifier import classify_exception, classify_report_text
     ("error", "category"),
     [
         (AssertionError("x"), "ASSERTION_FAILED"),
-        (PlaywrightTimeoutError("Timeout 10000ms exceeded"), "TIMEOUT"),
-        (PlaywrightError("strict mode violation: resolved to 6 elements"), "LOCATOR_AMBIGUOUS"),
-        (PlaywrightError("net::ERR_NAME_NOT_RESOLVED"), "NETWORK_ERROR"),
-        (PlaywrightError("Target page, context or browser has been closed"), "BROWSER_CLOSED"),
-        (PlaywrightError("khác"), "PLAYWRIGHT_ERROR"),
+        (TimeoutException("timeout"), "TIMEOUT"),
+        (NoSuchElementException("no such element"), "ELEMENT_NOT_FOUND"),
+        (StaleElementReferenceException("stale"), "STALE_ELEMENT"),
+        (ElementClickInterceptedException("intercepted"), "ELEMENT_NOT_INTERACTABLE"),
+        (UnexpectedAlertPresentException("Sorting is broken!"), "UNEXPECTED_ALERT"),
+        (InvalidSessionIdException("invalid session id"), "BROWSER_CLOSED"),
+        (WebDriverException("unknown error: net::ERR_NAME_NOT_RESOLVED"), "NETWORK_ERROR"),
+        (WebDriverException("khác"), "WEBDRIVER_ERROR"),
         (ValueError("x"), "DATA_OR_CONTRACT_ERROR"),
         (KeyError("x"), "DATA_OR_CONTRACT_ERROR"),
         (RuntimeError("x"), "UNEXPECTED_ERROR"),
@@ -29,9 +39,10 @@ def test_classify_exception(error, category):
 @pytest.mark.parametrize(
     ("text", "category"),
     [
-        ("playwright._impl._errors.TimeoutError: Locator expected", "TIMEOUT"),
-        ("E   AssertionError: Locator expected to have text", "ASSERTION_FAILED"),
-        ("ValueError: Keyword chưa khai báo", "DATA_OR_CONTRACT_ERROR"),
+        ("selenium.common.exceptions.TimeoutException: Message:", "TIMEOUT"),
+        ("E   AssertionError: assert 'Products' == 'Your Cart'", "ASSERTION_FAILED"),
+        ("selenium.common.exceptions.UnexpectedAlertPresentException: Alert Text: Sorting is broken!", "UNEXPECTED_ALERT"),
+        ("ValueError: Không có sản phẩm", "DATA_OR_CONTRACT_ERROR"),
         ("", "UNEXPECTED_ERROR"),
     ],
 )

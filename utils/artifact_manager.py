@@ -13,7 +13,6 @@ class ArtifactLayout:
     logs: Path
     screenshots: Path
     page_sources: Path
-    traces: Path
     junit: Path
     allure_results: Path
 
@@ -27,7 +26,6 @@ def create_artifact_layout(root, run_id=None):
         logs=base / "logs",
         screenshots=base / "screenshots" / run_id,
         page_sources=base / "page_sources" / run_id,
-        traces=base / "traces" / run_id,
         junit=base / "junit",
         allure_results=base / "allure-results",
     )
@@ -35,7 +33,6 @@ def create_artifact_layout(root, run_id=None):
         layout.logs,
         layout.screenshots,
         layout.page_sources,
-        layout.traces,
         layout.junit,
         layout.allure_results,
     ):

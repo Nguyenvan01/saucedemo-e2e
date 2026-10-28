@@ -99,13 +99,11 @@ def test_case_params_rejects(cases, message):
         case_params(cases)
 
 
-def test_session_seconds_left(tmp_path):
-    file = tmp_path / "state.json"
-    assert session_seconds_left(file) == 0
-    state = {"cookies": [{"name": "session-username", "value": "u", "expires": 1600}], "origins": []}
-    file.write_text(json.dumps(state), encoding="utf-8")
-    assert session_seconds_left(file, now=1000) == 600
-    assert session_seconds_left(file, now=2000) == 0
+def test_session_seconds_left():
+    assert session_seconds_left(None) == 0
+    cookie = {"name": "session-username", "value": "u", "expiry": 1600}
+    assert session_seconds_left(cookie, now=1000) == 600
+    assert session_seconds_left(cookie, now=2000) == 0
 
 
 @pytest.mark.parametrize(

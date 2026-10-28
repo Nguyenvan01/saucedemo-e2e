@@ -9,57 +9,62 @@ import pytest
 from utils.cases import case_params
 from utils.data_loader import load_data, resolve_data
 from utils.routes import ROUTES
+from utils.storage import read_cart
 
 DATA = load_data("checkout/checkout.json")
 CUSTOMER = DATA["customer"]
 
 
 @pytest.fixture(autouse=True)
-def open_inventory(k):
-    k.inventory.open_inventory()
+def open_inventory(po):
+    po.inventory.open()
 
 
-def _go_to_checkout(k, products):
-    k.inventory.add_products_to_cart(products)
-    k.cart.open_cart()
-    k.cart.proceed_to_checkout()
+def go_to_overview(po, products):
+    po.inventory.add_all_to_cart(products)
+    po.header.open_cart()
+    info = po.cart.checkout()
+    info.fill(CUSTOMER["firstName"], CUSTOMER["lastName"], CUSTOMER["postalCode"])
+    info.submit()
+    info.wait_for_path(ROUTES["checkoutOverview"])
 
 
 @pytest.mark.parametrize("case", case_params(DATA["purchase"]))
-def test_purchase(k, ctx, case):
+def test_purchase(po, ctx, case):
     done = ctx["msg"]["checkout"]
-    _go_to_checkout(k, case["products"])
-    k.checkout.fill_checkout_info(CUSTOMER["firstName"], CUSTOMER["lastName"], CUSTOMER["postalCode"])
-    k.checkout.continue_checkout()
-    k.common.verify_url(ROUTES["checkoutOverview"])
-    k.checkout.verify_overview_items(case["products"])
-    k.checkout.verify_item_total(case["itemTotal"])
-    k.checkout.verify_item_total_equals_sum()
-    k.checkout.verify_total_equals_item_total_plus_tax()
-    k.checkout.finish_checkout()
-    k.common.verify_url(ROUTES["checkoutComplete"])
-    k.checkout.verify_order_complete(done["completeHeader"], done["completeText"])
-    k.common.verify_cart_badge(0)
-    k.common.verify_cart_storage([])
-    k.checkout.back_home()
+    go_to_overview(po, case["products"])
+    overview = po.checkout_overview
+    assert overview.names() == case["products"]
+    assert overview.subtotal_text() == f"Item total: {case['itemTotal']}"
+    amounts = overview.amounts()
+    assert amounts["itemTotal"] == sum(amounts["prices"])
+    assert amounts["total"] == amounts["itemTotal"] + amounts["tax"]
+    overview.finish()
+    overview.wait_for_path(ROUTES["checkoutComplete"])
+    assert po.checkout_complete.header() == done["completeHeader"]
+    assert po.checkout_complete.message() == done["completeText"]
+    assert po.header.cart_badge() == 0
+    assert read_cart(po.driver) == []
+    po.checkout_complete.back_home()
 
 
 @pytest.mark.parametrize("case", case_params(DATA["validation"]))
-def test_required_fields(k, ctx, case):
+def test_required_fields(po, ctx, case):
     c = resolve_data(case, ctx)
-    k.cart.open_cart()
-    k.cart.proceed_to_checkout()
-    k.checkout.continue_checkout_expecting_error(c["firstName"], c["lastName"], c["postalCode"], c["error"])
-    k.common.verify_url(ROUTES["checkoutInfo"])
+    info = po.header.open_cart().checkout()
+    info.fill(c["firstName"], c["lastName"], c["postalCode"])
+    info.submit()
+    assert info.error_message() == c["error"]
+    assert info.current_path() == ROUTES["checkoutInfo"]
 
 
 @pytest.mark.parametrize("case", case_params(DATA["cancel"]))
-def test_cancel(k, case):
-    _go_to_checkout(k, case["products"])
+def test_cancel(po, case):
     if case["cancelAt"] == "overview":
-        k.checkout.fill_checkout_info(CUSTOMER["firstName"], CUSTOMER["lastName"], CUSTOMER["postalCode"])
-        k.checkout.continue_checkout()
-        k.common.verify_url(ROUTES["checkoutOverview"])
-    k.checkout.cancel_checkout()
-    k.common.verify_url(case["expectedPath"])
-    k.common.verify_cart_badge(len(case["products"]))
+        go_to_overview(po, case["products"])
+        po.checkout_overview.cancel()
+    else:
+        po.inventory.add_all_to_cart(case["products"])
+        po.header.open_cart().checkout().cancel()
+    po.base.wait_for_path(case["expectedPath"])
+    assert po.header.cart_badge() == len(case["products"])

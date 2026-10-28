@@ -4,7 +4,7 @@
 # - requires  -> skip nếu thiếu điều kiện (mật khẩu trong .env)
 # - knownBug  -> xfail(strict=True): lỗi cố ý của app; nếu test PASS thì báo "bug đã sửa?"
 # - tags      -> marker pytest, vd: "@smoke" -> pytest.mark.smoke
-# - session   -> marker role(user): mở test với phiên đăng nhập sẵn của user đó (.auth/)
+# - session   -> marker role(user): mở test với phiên đăng nhập sẵn (cookie) của user đó
 # ============================================================
 import pytest
 

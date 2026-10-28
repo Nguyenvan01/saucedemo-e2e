@@ -10,50 +10,47 @@ Kết quả khảo sát trang thật (data-test, URL, thông báo nguyên văn, 
 - **Đối tượng kiểm thử**: https://www.saucedemo.com (Swag Labs) — SPA thuần frontend, không có backend API,
   không có trang quản trị. Phiên đăng nhập là cookie `session-username` (hết hạn sau 600 s);
   giỏ hàng là localStorage `cart-contents` (mảng id sản phẩm).
-- **Công nghệ**: Python 3.11+, pytest, pytest-playwright (chỉ Chromium), pytest-xdist (song song),
-  pytest-rerunfailures (retry trên CI), allure-pytest, openpyxl (đọc kịch bản Excel).
-- **Mô hình**: Hybrid = **POM** + **Keyword-Driven** + **Data-Driven**.
+- **Công nghệ**: Python 3.11+, **Selenium WebDriver 4** (Google Chrome, Selenium Manager tự tải chromedriver),
+  pytest, pytest-xdist (song song), pytest-rerunfailures (retry trên CI), allure-pytest.
+- **Mô hình**: **Data-Driven** + **Page Object Model**. Dữ liệu (input + expected) nằm trong file JSON;
+  mỗi phần tử dữ liệu là một test case; code test chỉ mô tả luồng và so sánh với dữ liệu.
 
 ```mermaid
 flowchart TD
     subgraph DATA["data/ (không chứa code)"]
-        JSON["auth/ inventory/ cart/ checkout/ *.json<br/>data-driven"]
-        XLSX["scenarios/*.xlsx<br/>TestSteps + TestData"]
+        JSON["auth/ inventory/ cart/ checkout/ *.json<br/>input + expected + meta"]
+    end
+
+    subgraph UTILS["utils/"]
+        DL["data_loader: load_data, resolve_data"]
+        CS["cases: case_params (id, tags, requires, knownBug, session)"]
     end
 
     subgraph TESTS["tests/"]
-        T["e2e/&lt;khu vực&gt;/test_*.py"]
-        KD["e2e/keyword_driven/test_scenarios.py"]
+        T["e2e/&lt;khu vực&gt;/test_*.py<br/>@pytest.mark.parametrize('case', ...)"]
         FW["framework/ (unit, không mạng)"]
     end
 
-    DRV["drivers/driver_script.py<br/>validate_steps + execute_steps"]
-    KW["keywords/ (fixture k)<br/>7 nhóm, 56 keyword"]
     PO["pages/ (fixture po)<br/>Page Object + component"]
-    PW["Playwright → Chromium"]
+    SE["Selenium WebDriver → Chrome"]
     APP[("saucedemo.com")]
 
-    JSON -->|load_data + case_params| T
-    XLSX -->|hybrid_reader + template_binding| KD
-    KD --> DRV --> KW
-    T --> KW
-    KW --> PO --> PW --> APP
+    JSON --> DL --> CS --> T
+    T --> PO --> SE --> APP
 ```
 
 ## 2. Các tầng và trách nhiệm
 
 | Tầng | Thư mục | Trách nhiệm | Được gọi bởi |
 |---|---|---|---|
-| Cấu hình | [config.py](config.py) | Đọc `.env`; URL, mật khẩu chung, danh sách user, timeout, viewport | Mọi tầng |
-| Data | [data/](data/) | Test case, input, expected, kịch bản Excel | `utils/` (loader) |
-| Test | [tests/](tests/) | Chọn dữ liệu, gọi keyword | pytest |
-| Driver Script | [drivers/](drivers/) | Kiểm tra schema kịch bản, thay biến runtime, chạy từng bước, gắn ngữ cảnh vào lỗi | `tests/e2e/keyword_driven` |
-| Keyword | [keywords/](keywords/) | Bước nghiệp vụ + kiểm tra; mỗi keyword = 1 Allure step + log START/PASS/FAIL | Test, Driver |
-| Page Object | [pages/](pages/) | Locator và thao tác nguyên tử; không assertion nghiệp vụ | Keyword (và conftest khi tạo phiên) |
+| Cấu hình | [config.py](config.py) | Đọc `.env`; URL, mật khẩu chung, danh sách user, timeout, kích thước cửa sổ | Mọi tầng |
+| Data | [data/](data/) | Test case: id, tiêu đề, input, expected, meta (tags, requires, knownBug, session) | `utils/` (loader) |
+| Test | [tests/](tests/) | Nạp dữ liệu, tham số hoá, gọi Page Object, `assert` kết quả so với dữ liệu | pytest |
+| Page Object | [pages/](pages/) | Locator + thao tác + đọc trạng thái trang; chờ tường minh; mỗi thao tác nghiệp vụ = 1 Allure step | Test (và conftest khi tạo phiên) |
 | Utils | [utils/](utils/) | Logging, phân loại lỗi, evidence, đọc dữ liệu, storage, thông báo nguyên văn | Mọi tầng |
 
-**Quy tắc phụ thuộc** (chỉ đi một chiều): `tests → drivers → keywords → pages → Playwright`.
-Page Object không biết đến keyword; keyword không mở/đóng browser; **locator chỉ nằm trong `pages/`**.
+**Quy tắc phụ thuộc** (chỉ đi một chiều): `tests → pages → Selenium`.
+Page Object không chứa expected của ca kiểm thử; test không chứa locator; **locator chỉ nằm trong `pages/`**.
 
 ## 3. Chi tiết từng tầng
 
@@ -61,55 +58,35 @@ Page Object không biết đến keyword; keyword không mở/đóng browser; **
 
 ```text
 pages/
-  base_page.py              # BasePage (title, error dùng chung) + slug(tên sản phẩm)
-  page_objects.py           # PageObjects: gom mọi page/component của 1 `page` (k.po.inventory, k.po.menu...)
+  base_page.py              # BasePage: find/click/type/text/wait_until/open/reload + by_test, slug, @step
+  page_objects.py           # PageObjects: gom mọi page/component của 1 driver (po.inventory, po.menu...)
   components/header.py      # icon giỏ + badge
-  components/burger_menu.py # nút mở/đóng, 5 mục menu, panel (trạng thái mở)
+  components/burger_menu.py # nút mở/đóng, 5 mục menu, trạng thái mở
   login_page.py  inventory_page.py  product_detail_page.py  cart_page.py
   checkout_info_page.py  checkout_overview_page.py  checkout_complete_page.py
 ```
 
-- `selectors.set_test_id_attribute("data-test")` (fixture `_test_id_attribute`) → mọi locator ưu tiên
-  `get_by_test_id(...)`; `get_by_role` chỉ dùng khi không có `data-test` (2 nút burger, panel menu).
-- `data-test` trùng giữa các item (`inventory-item-name`...) → lọc theo item cha bằng `filter(has=...)`;
+- Locator là tuple `(By, value)` khai báo ở đầu lớp. Ưu tiên `by_test("x")` = `[data-test="x"]`;
+  ngoại lệ duy nhất: 2 nút burger dùng `By.ID` (không có `data-test` trên `<button>`), khung menu dùng `.bm-menu-wrap`.
+- **Chờ tường minh**: mọi thao tác đi qua `WebDriverWait` (`find` chờ hiển thị, `click` chờ click được và
+  thử lại khi bị phần tử khác che). Không dùng implicit wait, không `time.sleep` cứng.
+- Mỗi trang có `landmark` (phần tử báo trang đã sẵn sàng); `open()`, `reload()` và các thao tác chuyển trang
+  chờ landmark của trang đích rồi trả về Page Object của trang đó (vd `cart.checkout()` → `CheckoutInfoPage`).
+- `data-test` trùng giữa các item (`inventory-item-name`...) → tìm thẻ cha có tên đúng nguyên văn rồi tìm con;
   nút thêm/bỏ dùng `data-test` có slug: `add-to-cart-<slug>` / `remove-<slug>`.
-- Menu đóng chỉ bị dịch ra ngoài màn hình (`is_visible()` vẫn `True`) nhưng có `aria-hidden="true"` →
-  trạng thái mở xác định bằng `get_by_role("navigation")` (role locator bỏ qua phần tử aria-hidden).
+- Menu đóng có thuộc tính `hidden`; khi mở, khung trượt vào trong 0,5 s → `open_menu` chờ `aria-hidden="false"`
+  và khung nằm hẳn trong màn hình trước khi bấm mục.
+- Decorator `@step('... "{name}"')` (trong `base_page.py`): tạo Allure step với tên lấy từ tham số,
+  che mật khẩu (`mask_secrets`), log START/PASS/FAIL kèm error category.
 
-### 3.2 Keyword — `keywords/`
+### 3.2 Data — `data/` và `utils/`
 
-- [base_keywords.py](keywords/base_keywords.py): `BaseKeywords(page, po)` + decorator `@keyword("tenCamelCase")`.
-  `self.step(title)` bọc thân keyword: tạo Allure step, che mật khẩu (`mask_secrets`), log kèm error category.
-- [keywords/\_\_init\_\_.py](keywords/__init__.py):
-  - `GROUPS` liệt kê 7 nhóm: `common, auth, inventory, product, cart, checkout, menu`.
-  - `KEYWORD_MAP` — registry tường minh `"nhóm.tenKeyword" → (thuộc tính, method)`, dựng lúc import,
-    báo lỗi nếu trùng tên hoặc nhóm thiếu `group`. Không dùng `eval`.
-  - `Keywords` (fixture `k`): tạo `PageObjects` rồi từng nhóm; `resolve(name)` trả method đã bind.
-- Keyword hành động (`addProductToCart`, `finishCheckout`...) chỉ thao tác; kết quả được kiểm tra bằng
-  keyword `verify*` / `…Expecting…` riêng → lỗi cố ý của app lộ ra đúng ở bước kiểm tra.
-- Danh mục đầy đủ sinh tự động vào [KEYWORDS.md](KEYWORDS.md) bằng `scripts/gen_keywords_doc.py`.
+Đường đi của dữ liệu: `data/<khu-vực>/*.json` → `load_data` → `case_params` → `@pytest.mark.parametrize("case", ...)`
+→ mỗi phần tử là một pytest item có id riêng (`AUTH-E04`, `CHK-01`...).
 
-### 3.3 Driver Script — `drivers/driver_script.py`
-
-1. `validate_steps`: đúng schema (`case_id, step, keyword, args, note`), step liên tục 1..n,
-   keyword có trong `KEYWORD_MAP`, `args` là mảng, có ít nhất 1 bước kiểm tra (`verify*` / `…Expecting…`).
-2. `execute_steps`: với mỗi bước — `resolve_data(args, ctx)` thay `${...}` → log START → gọi keyword trong Allure step.
-3. Lỗi: phân loại, `add_note` (case, step, keyword, args, category), log, đính kèm category vào Allure, rồi **raise lại**.
-
-### 3.4 Data — `data/` và `utils/`
-
-| Nguồn | Đường đi |
-|---|---|
-| `data/<khu-vực>/*.json` | `load_data` → `case_params` → `@pytest.mark.parametrize("case", ...)` |
-| `data/scenarios/*.xlsx` | `hybrid_reader` (sheet `TestSteps` + `TestData`) → `template_binding` (gắn `{cot}`) → 1 pytest item / dòng TestData |
-
-File `.xlsx` sinh bằng `scripts/gen_scenarios_xlsx.py` (định nghĩa kịch bản nằm trong script → tái tạo được).
-
-Hai tầng thay biến:
-
-| Cú pháp | Thời điểm | Xử lý ở |
+| Cú pháp trong dữ liệu | Thời điểm | Xử lý ở |
 |---|---|---|
-| `{cot}` | Collection — lỗi báo trước khi mở browser | `utils/template_binding.py` |
+| `load_data("auth/login.json#invalid")` | Collection — lỗi file/nhánh báo trước khi mở browser | `utils/data_loader.py` |
 | `${msg.login.lockedOut}`, `${env.password}`, `${uid}` | Runtime | `utils/data_loader.resolve_data` + fixture `ctx` |
 | `"@data:inventory/sorting.json#za.names"` | Khi thay biến | `utils/data_loader.py` |
 
@@ -120,22 +97,22 @@ Metadata của case ([utils/cases.py](utils/cases.py)):
 
 | Meta | Tác dụng |
 |---|---|
+| `id`, `title` | id pytest item (chọn bằng `-k`), tiêu đề Allure `[ID] Tiêu đề`; id trùng → lỗi lúc collection |
 | `tags` | marker, vd `@smoke` → `pytest.mark.smoke` |
 | `requires` | skip khi thiếu điều kiện (`password` = cần `SAUCE_PASSWORD`) |
 | `knownBug` | `xfail(strict=True)` — lỗi cố ý của problem_user / error_user / visual_user; nếu PASS → báo "bug đã sửa?" |
 | `session` | marker `role(user)` → test chạy với phiên đăng nhập sẵn của user đó |
 
-### 3.5 Utils — `utils/`
+### 3.3 Utils — `utils/`
 
 | File | Vai trò |
 |---|---|
 | `logging_config.py` | Log có cấu trúc `TC_ID \| Step \| Action \| Target \| Result`; `current_tc_id` (contextvar) |
-| `error_classifier.py` | Taxonomy lỗi dùng chung cho log / JUnit / Allure |
+| `error_classifier.py` | Taxonomy lỗi Selenium dùng chung cho log / JUnit / Allure |
 | `artifact_manager.py` | Thư mục evidence theo `run_id`, tên file an toàn |
-| `hybrid_reader.py`, `template_binding.py` | Đọc và binding kịch bản Excel |
 | `data_loader.py`, `cases.py` | Nạp JSON, thay biến, che bí mật, metadata case |
-| `storage.py` | Ghi storageState (atomic), đọc hạn cookie phiên, đọc giỏ trong localStorage |
-| `assertions.py` | `poll_until` (chờ bằng `page.wait_for_timeout`), `money` (Decimal) |
+| `storage.py` | Hạn cookie phiên, đọc giỏ trong localStorage (`execute_script`) |
+| `assertions.py` | `poll_until` (chờ điều kiện không gắn phần tử), `money` (Decimal) |
 | `routes.py`, `messages.py` | Đường dẫn trang, thông báo nguyên văn của app |
 
 ## 4. Vòng đời một lần chạy — `tests/conftest.py`
@@ -147,40 +124,41 @@ sequenceDiagram
     participant F as fixture
     participant T as test
     P->>C: pytest_configure
-    Note over C: run_id, thư mục artifacts/<env>/, logging,<br/>JUnit + Allure, trace/video retain-on-failure, reruns (CI)
+    Note over C: run_id, thư mục artifacts/<env>/, logging,<br/>JUnit + Allure, reruns (CI)
     P->>C: pytest_collection_modifyitems
-    Note over C: gắn marker core / e2e / keyword theo thư mục
-    P->>F: mỗi test: browser_context_args → context → page → k / po / ctx
-    Note over F: marker role(user) → auth_states(user):<br/>.auth/prod-<user>.json còn ≥ 180 s thì dùng lại,<br/>không thì đăng nhập qua UI và ghi lại
+    Note over C: gắn marker core / e2e theo thư mục
+    P->>F: mỗi test: driver → po / ctx
+    Note over F: marker role(user) → auth_sessions(user):<br/>cookie còn ≥ 180 s thì dùng lại, không thì đăng nhập qua UI;<br/>gắn cookie vào Chrome mới của test
     F->>T: chạy test
     T-->>C: pytest_runtest_makereport (khi FAIL)
     Note over C: error category, screenshot, page source, URL → artifacts + Allure
+    F->>F: driver.quit()
 ```
 
 Fixture chính:
 
 | Fixture | Scope | Nội dung |
 |---|---|---|
-| `_test_id_attribute` | session | `selectors.set_test_id_attribute("data-test")` |
-| `auth_states` | session | Hàm `user → file storageState còn hạn`; đăng nhập qua UI một lần cho mỗi user cần dùng (mỗi worker), tự làm mới khi cookie sắp hết hạn |
-| `browser_context_args` | test | `base_url`, locale, viewport; marker `role` chọn phiên đăng nhập |
-| `context` / `page` | test | Context mới (timeout mặc định), page mới |
-| `k` / `po` | test | Thư viện keyword / Page Object |
+| `auth_sessions` | session | Hàm `user → cookie phiên còn hạn`; đăng nhập qua UI một lần cho mỗi user cần dùng (mỗi worker), tự làm mới khi cookie sắp hết hạn |
+| `driver` | test | Chrome mới (headless, trừ khi `--headed`), cửa sổ 1280×720, tắt trình quản lý mật khẩu; marker `role` gắn cookie phiên |
+| `po` | test | `PageObjects(driver)` |
 | `ctx` | test | Biến runtime cho `${...}`: `env` (URL, mật khẩu), `msg` (thông báo) |
+
+Mỗi test một Chrome riêng → không rò trạng thái (cookie, localStorage) giữa các test.
 
 ## 5. Lỗi và bằng chứng
 
-- Không keyword nào nuốt lỗi để trả boolean; lỗi luôn đi lên tới pytest. Không dùng `time.sleep`.
-- Phân loại: `ASSERTION_FAILED`, `TIMEOUT`, `LOCATOR_AMBIGUOUS`, `NETWORK_ERROR`, `BROWSER_CLOSED`,
-  `PLAYWRIGHT_ERROR`, `DATA_OR_CONTRACT_ERROR`, `UNEXPECTED_ERROR`.
-- Một đầu mối thu evidence duy nhất (`pytest_runtest_makereport`); pytest-playwright giữ trace + video khi FAIL.
+- Page Object không nuốt lỗi để trả boolean; lỗi luôn đi lên tới pytest.
+- Phân loại: `ASSERTION_FAILED`, `TIMEOUT`, `ELEMENT_NOT_FOUND`, `STALE_ELEMENT`, `ELEMENT_NOT_INTERACTABLE`,
+  `UNEXPECTED_ALERT`, `NETWORK_ERROR`, `BROWSER_CLOSED`, `WEBDRIVER_ERROR`, `DATA_OR_CONTRACT_ERROR`, `UNEXPECTED_ERROR`.
+- Một đầu mối thu evidence duy nhất (`pytest_runtest_makereport`, chạy trước khi đóng driver):
+  screenshot, page source, URL hiện tại.
 - Bí mật: mật khẩu chỉ ở `.env` / GitHub Secret `SAUCE_PASSWORD`; `mask_secrets` che trong log và tên step.
-  Lưu ý: trace Playwright (chỉ giữ khi FAIL) ghi nguyên giá trị `fill`, kể cả mật khẩu.
 - Đầu ra:
 
 ```text
 artifacts/prod/
-  logs/  screenshots/<run_id>/  page_sources/<run_id>/  traces/<run_id>/  junit/results.xml  allure-results/
+  logs/  screenshots/<run_id>/  page_sources/<run_id>/  junit/results.xml  allure-results/
 ```
 
 ## 6. Phân nhóm test
@@ -189,42 +167,22 @@ artifacts/prod/
 |---|---|---|
 | `tests/framework/` | `core` | Không — unit test của chính framework |
 | `tests/e2e/<khu-vực>/` | `e2e` | Có — smoke, auth, inventory, cart, checkout, menu |
-| `tests/e2e/keyword_driven/` | `keyword` + `e2e` | Có — chạy toàn bộ `data/scenarios/*.xlsx` |
 
 Marker theo dữ liệu: `smoke` (từ `tags`).
 
 ## 7. CI/CD và tài liệu sinh tự động
 
 - [.github/workflows/e2e.yml](.github/workflows/e2e.yml): chạy khi push/PR vào `main` hoặc chạy tay theo marker.
-  Các bước: cài dependency + Chromium → `--collect-only` (bắt lỗi dữ liệu sớm) → `pytest -n 4`
+  Các bước: cài dependency (Chrome có sẵn trên runner) → `--collect-only` (bắt lỗi dữ liệu sớm) → `pytest -n 4`
   → bảng tóm tắt từ JUnit → upload `artifacts/prod/`.
-- `scripts/gen_keywords_doc.py` → [KEYWORDS.md](KEYWORDS.md); `scripts/gen_test_cases.py` → [TEST_CASES.md](TEST_CASES.md)
-  (từ kết quả lần chạy gần nhất); `scripts/gen_scenarios_xlsx.py` → `data/scenarios/*.xlsx`.
+- `scripts/gen_test_cases.py` → [TEST_CASES.md](TEST_CASES.md) (từ kết quả lần chạy gần nhất).
 
 ## 8. Mở rộng framework
 
 | Muốn | Sửa ở đâu |
 |---|---|
-| Thêm case cho test có sẵn | Thêm phần tử vào file JSON trong `data/` |
-| Kịch bản mới không cần code | Thêm vào `WORKBOOKS` trong `scripts/gen_scenarios_xlsx.py` rồi chạy script |
-| Keyword mới | Locator ở `pages/` → method `@keyword` trong `keywords/kw_*.py` → chạy `gen_keywords_doc.py` |
-| Nhóm keyword mới | Lớp con `BaseKeywords` có `group`, thêm vào `GROUPS` |
-| Trang mới | File trong `pages/`, thêm vào `PageObjects` |
+| Thêm case cho test có sẵn | Thêm phần tử vào file JSON trong `data/` — không sửa code |
+| Luồng kiểm thử mới | Dữ liệu trong `data/`, hàm test mới trong `tests/e2e/<khu-vực>/` dùng `case_params` |
+| Thao tác / phần tử mới | Locator + method trong `pages/` (bọc `@step` nếu là bước nghiệp vụ) |
+| Trang mới | Lớp con `BasePage` trong `pages/` (có `path`, `landmark`), thêm vào `PageObjects` |
 | Thông báo mới của app | `utils/messages.py`, dữ liệu dùng `${msg...}` |
-
-## 9. Khác biệt so với kiến trúc gốc (cloth-store-e2e)
-
-| Hạng mục | cloth-store-e2e | saucedemo-e2e |
-|---|---|---|
-| API / backend | `tests/api/`, `utils/api_client.py` | Bỏ — site không có API |
-| An toàn ghi dữ liệu | `ALLOW_WRITE`, write guard, `mock_write` | Bỏ — không có dữ liệu server để bảo vệ |
-| Môi trường | local + prod | Chỉ prod (`artifacts/prod/`) |
-| Mobile, admin, `purchasable` | Có | Bỏ |
-| Locator | `get_by_role` / label / placeholder | `data-test` trước (`get_by_test_id`), sau đó `get_by_role` |
-| Đăng nhập sẵn | qua API, token trong localStorage | qua UI, cookie; tự làm mới khi còn < 180 s (cookie sống 600 s) |
-| Chọn phiên | marker `role` viết trong test | thêm meta `session` trong dữ liệu → marker `role` |
-| Nhóm keyword | 14 nhóm | 7 nhóm: `common, auth, inventory, product, cart, checkout, menu` |
-| Đọc `.env` | python-dotenv | Hàm đọc nhỏ trong `config.py` (không thêm dependency) |
-| `poll_until` | ContextVar `current_page`, fallback `time.sleep` | Nhận `page` trực tiếp, không `time.sleep` |
-| File `.xlsx` | Sửa tay | Sinh bằng `scripts/gen_scenarios_xlsx.py` |
-| Retry | 1 (local remote) / 2 (CI) | 0 local / 1 CI |

@@ -9,7 +9,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 DATA_DIR = ROOT / "data"
-SCENARIO_DIR = DATA_DIR / "scenarios"
 
 
 def _load_env(path):
@@ -40,17 +39,13 @@ USERS = (
     "visual_user",
 )
 
-# storageState của từng user (sinh bởi fixture auth_states trong tests/conftest.py).
-AUTH_DIR = ROOT / ".auth"
-# Cookie phiên của saucedemo hết hạn sau 600 s; state còn ít hơn chừng này thì đăng nhập lại.
+# Cookie phiên của saucedemo hết hạn sau 600 s; cookie còn ít hơn chừng này thì đăng nhập lại.
 AUTH_MIN_REMAINING_SECONDS = 180
 
-# Timeout (mili giây) theo quy ước của Playwright.
-# performance_glitch_user mất ~5,5 s mới hiện danh sách sản phẩm -> EXPECT_TIMEOUT phải > 6 s.
-EXPECT_TIMEOUT = 10_000
-ACTION_TIMEOUT = 10_000
-NAVIGATION_TIMEOUT = 20_000
+# Timeout (giây) cho WebDriverWait / page load.
+# performance_glitch_user mất ~5,5 s mới hiện danh sách sản phẩm -> WAIT_TIMEOUT phải > 6 s.
+WAIT_TIMEOUT = 10
+PAGE_LOAD_TIMEOUT = 20
 
-TEST_ID_ATTRIBUTE = "data-test"
-VIEWPORT = {"width": 1280, "height": 720}
+WINDOW_SIZE = (1280, 720)
 LOCALE = "en-US"

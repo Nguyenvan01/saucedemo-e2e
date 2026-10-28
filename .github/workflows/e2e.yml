@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       marker:
-        description: 'Biểu thức marker pytest (vd: smoke, e2e, "e2e and not keyword")'
+        description: 'Biểu thức marker pytest (vd: smoke, e2e, "e2e and not smoke")'
         required: false
         default: ""
 
@@ -42,9 +42,7 @@ jobs:
           cache: pip
 
       - name: Cài dependency
-        run: |
-          python -m pip install -r requirements.txt
-          python -m playwright install --with-deps chromium
+        run: python -m pip install -r requirements.txt
 
       - name: Kiểm tra dữ liệu + thu thập test
         run: python -m pytest --collect-only -q ${MARKER:+-m "$MARKER"}
@@ -74,7 +72,7 @@ jobs:
                   print(f"- `{tc.get('classname')}::{tc.get('name')}`")
           PY
 
-      - name: Lưu báo cáo (JUnit, Allure, log, ảnh, trace)
+      - name: Lưu báo cáo (JUnit, Allure, log, ảnh, page source)
         if: always()
         uses: actions/upload-artifact@v4
         with:
